@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Inbound Checker</title>
+<style>
+  :root { font-family: system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f6f9; color: #14213d; }
+  .screen { display: none; padding: 1.25rem; max-width: 640px; margin: 0 auto; }
+  .screen.active { display: block; }
+
+  h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+  #drop { border: 2px dashed #9aa7bd; border-radius: 8px; padding: 2rem 1rem; text-align: center;
+          background: #fff; cursor: pointer; }
+  #drop.hover { border-color: #14213d; background: #eef2f8; }
+  .muted { color: #64748b; font-size: 14px; }
+
+  button { font: inherit; cursor: pointer; border: none; border-radius: 10px; }
+  .btn-primary { background: #14213d; color: #fff; padding: 1rem; width: 100%;
+                 font-size: 1.15rem; font-weight: 600; margin-top: 1rem; }
+  .btn-primary:disabled { background: #9aa7bd; }
+
+  /* --- card flow --- */
+  #cardScreen { min-height: 100vh; display: none; flex-direction: column; padding: 1rem;
+                max-width: 640px; margin: 0 auto; }
+  #cardScreen.active { display: flex; }
+  .bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: #14213d; transition: width .2s; }
+  .progress-text { text-align: center; margin: .5rem 0 1rem; font-size: 14px; color: #64748b; }
+
+  .card { background: #fff; border-radius: 14px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+          flex: 1; display: flex; flex-direction: column; }
+  .shelf { font-size: 3rem; font-weight: 800; letter-spacing: 1px; text-align: center; }
+  .name { font-size: 1.35rem; text-align: center; margin: .5rem 0; }
+  .sku { text-align: center; color: #64748b; font-size: .9rem; margin-bottom: 1.25rem; }
+
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: .85rem; color: #64748b; margin-bottom: .25rem; }
+  .field input { width: 100%; padding: .9rem; font-size: 1.6rem; text-align: center;
+                 border: 2px solid #cbd5e1; border-radius: 10px; }
+  .field input:focus { outline: none; border-color: #14213d; }
+
+  .status { text-align: right; font-size: 1.5rem; font-weight: 700; padding: .75rem;
+            border-radius: 10px; margin-top: auto; }
+  .status.blank { color: #94a3b8; font-weight: 400; font-size: 1rem; }
+  .status.under { color: #fff; background: #c62828; }
+  .status.over  { color: #fff; background: #1565c0; }
+  .status.error { color: #fff; background: #e65100; }
+
+  .nav { display: flex; gap: .75rem; margin-top: 1rem; }
+  .nav button { flex: 1; padding: 1rem; font-size: 1.1rem; font-weight: 600; }
+  .btn-prev { background: #e2e8f0; color: #14213d; }
+  .btn-next { background: #14213d; color: #fff; }
+  .btn-prev:disabled { opacity: .4; }
+
+  /* --- summary --- */
+  .sum-row { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem .25rem;
+             border-bottom: 1px solid #e2e8f0; font-size: 15px; }
+  .sum-row .tag { font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0; }
+  .tag.under { color: #c62828; } .tag.over { color: #1565c0; } .tag.error { color: #e65100; }
+  .tag.todo { color: #94a3b8; }
+
+  /* --- print / export PDF: replica of the original Flink report --- */
+  #printView { display: none; }
+  #printView .pv-top, #printView .pv-sub {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #printView .pv-top { background: #14213d; color: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 16px 22px; }
+  #printView .pv-title { font-size: 22px; font-weight: 800; }
+  #printView .pv-hub { font-size: 12px; opacity: .85; }
+  #printView .pv-logo { font-size: 22px; font-weight: 800; font-style: italic; }
+  #printView .pv-sub { background: #1c2e50; color: #fff; display: flex;
+    justify-content: space-between; padding: 8px 22px; font-size: 13px; }
+  #printView .pv-stats { display: flex; gap: 48px; padding: 18px 22px; }
+  #printView .pv-lbl { font-weight: 700; color: #14213d; font-size: 13px; }
+  #printView .pv-num { font-size: 28px; color: #14213d; margin-top: 4px; }
+  #printView .pv-dev { color: #14213d; padding: 0 22px; margin: 4px 0 8px; font-size: 16px; }
+  #printView .pv-foot { font-weight: 400; font-size: 10px; color: #666; }
+  #printView table { border-collapse: collapse; width: calc(100% - 44px); margin: 0 22px; font-size: 11px; }
+  #printView th, #printView td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+  #printView th { color: #8a93a5; font-weight: 600; }
+  #printView .pstatus { color: #d00; font-weight: 700; }
+  @media print {
+    body { background: #fff; }
+    .screen, #cardScreen { display: none !important; }
+    #printView { display: block !important; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- upload screen -->
+<div id="uploadScreen" class="screen active">
+  <h1>Inbound Checker</h1>
+  <div id="drop">Tap to choose your inbound PDF, or drop it here
+    <input type="file" id="file" accept="application/pdf" hidden>
+  </div>
+  <div id="loadInfo" class="muted" style="margin-top:1rem"></div>
+  <button id="startBtn" class="btn-primary" disabled>Start check</button>
+</div>
+
+<!-- card flow -->
+<div id="cardScreen">
+  <div class="bar"><span id="barFill"></span></div>
+  <div class="progress-text" id="progress"></div>
+  <div class="card">
+    <div class="shelf" id="cShelf"></div>
+    <div class="name" id="cName"></div>
+    <div class="sku" id="cSku"></div>
+    <div class="field">
+      <label>Expected</label>
+      <input type="number" inputmode="numeric" id="cExp">
+    </div>
+    <div class="field">
+      <label>Actual</label>
+      <input type="number" inputmode="numeric" id="cAct">
+    </div>
+    <div class="status blank" id="cStatus">Enter actual stock</div>
+  </div>
+  <div class="nav">
+    <button class="btn-prev" id="prevBtn">← Back</button>
+    <button class="btn-next" id="nextBtn">Next →</button>
+  </div>
+</div>
+
+<!-- summary -->
+<div id="sumScreen" class="screen">
+  <h1>Done</h1>
+  <div id="sumList"></div>
+  <button id="exportBtn" class="btn-primary">Export as PDF</button>
+  <button id="restartBtn" class="btn-primary" style="background:#e2e8f0;color:#14213d">Review again</button>
+  <button id="newPdfBtn" class="btn-primary" style="background:#e2e8f0;color:#14213d">Load another PDF</button>
+</div>
+
+<!-- print-only export view -->
+<div id="printView"></div>
+
+<script type="module">
+import * as pdfjs from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+let rows = [];
+let meta = {};
+let idx = 0;
+
+const $ = id => document.getElementById(id);
+const show = id => document.querySelectorAll('.screen, #cardScreen').forEach(el =>
+  el.classList.toggle('active', el.id === id));
+
+// --- upload ---
+const drop = $('drop'), fileInput = $('file');
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('hover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('hover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('hover');
+  if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => fileInput.files[0] && load(fileInput.files[0]));
+$('startBtn').addEventListener('click', () => { idx = 0; show('cardScreen'); renderCard(); });
+$('newPdfBtn').addEventListener('click', () => show('uploadScreen'));
+$('restartBtn').addEventListener('click', () => { idx = 0; show('cardScreen'); renderCard(); });
+$('exportBtn').addEventListener('click', exportPdf);
+
+async function load(file) {
+  $('loadInfo').textContent = 'Parsing ' + file.name + '…';
+  $('startBtn').disabled = true;
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const content = await (await pdf.getPage(p)).getTextContent();
+    lines.push(...groupLines(content.items));
+  }
+  rows = parseRows(lines);
+  meta = parseMeta(lines);
+  meta.hub = (rows[0] && rows[0].hub) || meta.hub || '';
+  rows.sort((a, b) => a.shelfId.localeCompare(b.shelfId, undefined, { numeric: true }));
+  rows.forEach(r => { r.actual = ''; });
+  $('loadInfo').textContent = 'Loaded ' + file.name + ' — ' + rows.length + ' items.';
+  $('startBtn').disabled = rows.length === 0;
+}
+
+// Group text fragments into lines by y-position; each line = words sorted left-to-right.
+function groupLines(items) {
+  const lines = new Map();
+  for (const it of items) {
+    const y = Math.round(it.transform[5]);
+    let bucket = null;
+    for (const key of lines.keys()) if (Math.abs(key - y) <= 3) { bucket = key; break; }
+    const k = bucket ?? y;
+    if (!lines.has(k)) lines.set(k, []);
+    lines.get(k).push({ x: it.transform[4], s: it.str });
+  }
+  return [...lines.values()].map(toks =>
+    toks.sort((a, b) => a.x - b.x).map(t => t.s.trim()).filter(Boolean));
+}
+
+// A data row: Hub, SKU, Product Name…, Shelf ID, Focus SKU, #Expected, #Inbound, #Deviation.
+function parseRows(lines) {
+  const out = [];
+  for (const words of lines) {
+    const shelfIdx = words.findIndex(w => /^\d{2,3}[A-Za-z]$/.test(w));
+    const skuIdx = words.findIndex(w => /^\d{6,}$/.test(w));
+    if (shelfIdx === -1 || skuIdx === -1 || skuIdx >= shelfIdx) continue; // not a data row
+    const nums = words.slice(shelfIdx + 1).filter(w => /^-?\d+$/.test(w));
+    out.push({
+      hub: words.find(w => /^[a-z]{2,}_/.test(w)) || words[0],
+      sku: words[skuIdx],
+      name: words.slice(skuIdx + 1, shelfIdx).join(' '),
+      shelfId: words[shelfIdx],
+      focus: words.slice(shelfIdx + 1).find(w => /^(Yes|No)$/i.test(w)) || '',
+      expected: nums.length > 0 ? Number(nums[0]) : '',
+      inbound: nums.length > 1 ? Number(nums[1]) : '',
+      deviation: nums.length > 2 ? Number(nums[2]) : '',
+    });
+  }
+  return out;
+}
+
+// Header metadata shown in the original report.
+function parseMeta(lines) {
+  const full = lines.map(l => l.join(' ')).join('\n');
+  const m = {
+    deliveryDate: (full.match(/Delivery date\s*:?\s*([A-Za-z]{3,} \d{1,2}, \d{4})/) || [])[1] || '',
+    lastUpdated: (full.match(/Last updated\s*:?\s*([A-Za-z]{3,} \d{1,2}, \d{4}(?:\s+\d{1,2}:\d{2})?)/) || [])[1] || '',
+  };
+  for (const w of lines) { // the big-number row: [units, fill%, distinct]
+    const pct = w.find(x => /^\d+(\.\d+)?%$/.test(x));
+    if (pct) {
+      const nums = w.filter(x => /^[\d,]+$/.test(x));
+      m.fillRate = pct;
+      m.expectedUnits = nums[0] || '';
+      m.distinctSkus = nums[nums.length - 1] || '';
+      break;
+    }
+  }
+  m.fillRate = m.fillRate || (full.match(/(\d+\.\d+%)/) || [])[1] || '';
+  m.expectedUnits = m.expectedUnits || (full.match(/(\d{1,3},\d{3})/) || [])[1] || '';
+  return m;
+}
+
+// deviation = actual - expected. Sign decides status; equal = inbounder made a mistake.
+function classify(expected, actual) {
+  if (expected === '' || actual === '') return { label: 'Enter actual stock', cls: 'blank', dev: '' };
+  const dev = actual - expected;
+  if (dev < 0) return { label: 'Underdelivery (' + dev + ')', cls: 'under', dev };
+  if (dev > 0) return { label: 'Overdelivery (+' + dev + ')', cls: 'over', dev };
+  return { label: 'ERROR', cls: 'error', dev };
+}
+
+// --- card flow ---
+function renderCard() {
+  const r = rows[idx];
+  $('cShelf').textContent = r.shelfId;
+  $('cName').textContent = r.name;
+  $('cSku').textContent = 'SKU ' + r.sku;
+  $('cExp').value = r.expected;
+  $('cAct').value = r.actual;
+  $('progress').textContent = (idx + 1) + ' / ' + rows.length;
+  $('barFill').style.width = ((idx + 1) / rows.length * 100) + '%';
+  $('prevBtn').disabled = idx === 0;
+  $('nextBtn').textContent = idx === rows.length - 1 ? 'Finish ✓' : 'Next →';
+  updateStatus();
+  $('cAct').focus();
+}
+
+function updateStatus() {
+  const e = $('cExp').value === '' ? '' : Number($('cExp').value);
+  const a = $('cAct').value === '' ? '' : Number($('cAct').value);
+  const { label, cls } = classify(e, a);
+  const s = $('cStatus');
+  s.textContent = label;
+  s.className = 'status ' + cls;
+}
+
+$('cExp').addEventListener('input', () => { rows[idx].expected = $('cExp').value === '' ? '' : Number($('cExp').value); updateStatus(); });
+$('cAct').addEventListener('input', () => { rows[idx].actual = $('cAct').value === '' ? '' : Number($('cAct').value); updateStatus(); });
+$('prevBtn').addEventListener('click', () => { if (idx > 0) { idx--; renderCard(); } });
+$('nextBtn').addEventListener('click', () => {
+  if (idx < rows.length - 1) { idx++; renderCard(); } else showSummary();
+});
+
+// --- summary ---
+function showSummary() {
+  const list = $('sumList');
+  list.innerHTML = '';
+  let flagged = 0;
+  rows.forEach(r => {
+    const { label, cls } = classify(r.expected, r.actual);
+    const tag = r.actual === '' ? { t: 'Not checked', c: 'todo' }
+              : { t: label, c: cls };
+    if (cls !== 'blank') flagged++;
+    const div = document.createElement('div');
+    div.className = 'sum-row';
+    div.innerHTML = `<span><b>${r.shelfId}</b> ${r.name}</span><span class="tag ${tag.c}">${tag.t}</span>`;
+    list.appendChild(div);
+  });
+  $('sumScreen').querySelector('h1').textContent = `Done — ${flagged} deviation${flagged===1?'':'s'}`;
+  show('sumScreen');
+}
+
+// Build a print-only replica of the list with status in red next to each product name,
+// then hand off to the browser's native print → "Save as PDF".
+function exportPdf() {
+  const body = rows.map(r => {
+    const { label } = classify(r.expected, r.actual);
+    const status = r.actual === '' ? '' : ` <span class="pstatus">— ${label}</span>`;
+    return `<tr>
+      <td>${r.hub}</td><td>${r.sku}</td>
+      <td>${r.name}${status}</td>
+      <td>${r.shelfId}</td><td>${r.focus}</td>
+      <td>${r.expected}</td><td>${r.inbound}</td><td>${r.deviation}</td>
+    </tr>`;
+  }).join('');
+  $('printView').innerHTML = `
+    <div class="pv-top">
+      <div class="pv-title">Inbound Checker</div>
+      <div class="pv-hub">Hub Code: ${meta.hub || '—'}</div>
+      <div class="pv-logo">Flink</div>
+    </div>
+    <div class="pv-sub">
+      <div>Same-day check</div>
+      <div>Delivery date: ${meta.deliveryDate || '—'} &nbsp;·&nbsp; Last updated: ${meta.lastUpdated || '—'}</div>
+    </div>
+    <div class="pv-stats">
+      <div><div class="pv-lbl">Expected Units today</div><div class="pv-num">${meta.expectedUnits || '—'}</div></div>
+      <div><div class="pv-lbl">Progressive Fill Rate %</div><div class="pv-num">${meta.fillRate || '—'}</div></div>
+      <div><div class="pv-lbl">Expected distinct SKUs today</div><div class="pv-num">${meta.distinctSkus || '—'}</div></div>
+    </div>
+    <h3 class="pv-dev">Inbound deviations
+      <span class="pv-foot">* Deviations are displayed once at least 40% of the supplier's expected quantity is received.</span>
+    </h3>
+    <table>
+      <thead><tr><th>Hub</th><th>SKU</th><th>Product Name</th><th>Shelf ID</th>
+        <th>Focus SKU</th><th># Expected</th><th># Inbound</th><th># Deviation</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+  window.print();
+}
+
+// self-check
+console.assert(classify(12, 0).cls === 'under', 'neg dev = underdelivery');
+console.assert(classify(4, 8).cls === 'over', 'pos dev = overdelivery');
+console.assert(classify(5, 5).cls === 'error', 'equal = error');
+console.assert(classify(5, '').cls === 'blank', 'missing actual = blank');
+</script>
+</body>
+</html>
