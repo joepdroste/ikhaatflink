@@ -249,7 +249,6 @@ function parseMeta(lines) {
 // count equals system (actual == expected) = inbounder mistake -> ERROR.
 function classify(expected, actual, pdfDev) {
   if (expected === '' || actual === '') return { label: 'Enter actual stock', cls: 'blank', dev: '' };
-  if (actual === expected) return { label: 'ERROR', cls: 'error', dev: 0 };
   const dev = (actual - expected) + (pdfDev === '' || pdfDev == null ? 0 : pdfDev);
   if (dev < 0) return { label: 'Underdelivery (' + dev + ')', cls: 'under', dev };
   if (dev > 0) return { label: 'Overdelivery (+' + dev + ')', cls: 'over', dev };
@@ -350,7 +349,7 @@ function exportPdf() {
 // self-check
 console.assert(classify(6, 12, -18).cls === 'under' && classify(6, 12, -18).dev === -12, 'example: under 12');
 console.assert(classify(6, 10, 0).cls === 'over' && classify(6, 10, 0).dev === 4, 'pos = overdelivery');
-console.assert(classify(5, 5, -3).cls === 'error', 'count == system = error');
+console.assert(classify(6, 6, 4).cls === 'over' && classify(6, 6, 4).dev === 4, 'equal counts, +pdf = over');
 console.assert(classify(6, 4, 2).cls === 'error', 'nets to zero = error');
 console.assert(classify(5, '', 0).cls === 'blank', 'missing actual = blank');
 </script>
