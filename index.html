@@ -246,8 +246,8 @@ function parseMeta(lines) {
 function classify(expected, actual) {
   if (expected === '' || actual === '') return { label: 'Enter actual stock', cls: 'blank', dev: '' };
   const dev = actual - expected;
-  if (dev < 0) return { label: 'Overdelivery (' + dev + ')', cls: 'over', dev };
-  if (dev > 0) return { label: 'Underdelivery (+' + dev + ')', cls: 'under', dev };
+  if (dev < 0) return { label: 'Underdelivery (' + dev + ')', cls: 'under', dev };
+  if (dev > 0) return { label: 'Overdelivery (+' + dev + ')', cls: 'over', dev };
   return { label: 'ERROR', cls: 'error', dev };
 }
 
@@ -342,8 +342,8 @@ function exportPdf() {
 }
 
 // self-check
-console.assert(classify(12, 0).cls === 'over', 'neg dev = overdelivery');
-console.assert(classify(4, 8).cls === 'under', 'pos dev = underdelivery');
+console.assert(classify(12, 0).cls === 'under', 'neg dev = underdelivery');
+console.assert(classify(4, 8).cls === 'over', 'pos dev = overdelivery');
 console.assert(classify(5, 5).cls === 'error', 'equal = error');
 console.assert(classify(5, '').cls === 'blank', 'missing actual = blank');
 </script>
