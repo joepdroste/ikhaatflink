@@ -44,7 +44,9 @@
 
   .status { text-align: right; font-size: 1.5rem; font-weight: 700; padding: .75rem;
             border-radius: 10px; margin-top: auto; }
+  .sysdev { text-align: center; color: #64748b; font-size: .9rem; margin-bottom: .5rem; }
   .status.blank { color: #94a3b8; font-weight: 400; font-size: 1rem; }
+  .status.ok    { color: #fff; background: #2e7d32; }
   .status.under { color: #fff; background: #c62828; }
   .status.over  { color: #fff; background: #1565c0; }
   .status.error { color: #fff; background: #e65100; }
@@ -60,7 +62,7 @@
              border-bottom: 1px solid #e2e8f0; font-size: 15px; }
   .sum-row .tag { font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0; }
   .tag.under { color: #c62828; } .tag.over { color: #1565c0; } .tag.error { color: #e65100; }
-  .tag.todo { color: #94a3b8; }
+  .tag.ok { color: #2e7d32; } .tag.todo { color: #94a3b8; }
 
   /* --- print / export PDF: replica of the original Flink report --- */
   #printView { display: none; }
@@ -114,9 +116,10 @@
       <input type="number" inputmode="numeric" id="cExp">
     </div>
     <div class="field">
-      <label>Actual</label>
+      <label>Actual (counted)</label>
       <input type="number" inputmode="numeric" id="cAct">
     </div>
+    <div class="sysdev" id="cSysDev"></div>
     <div class="status blank" id="cStatus">Enter actual stock</div>
   </div>
   <div class="nav">
@@ -242,13 +245,15 @@ function parseMeta(lines) {
   return m;
 }
 
-// deviation = actual - expected. Sign decides status; equal = inbounder made a mistake.
-function classify(expected, actual) {
+// final deviation = (actual - expected) + PDF #Deviation.
+// count equals system (actual == expected) = inbounder mistake -> ERROR.
+function classify(expected, actual, pdfDev) {
   if (expected === '' || actual === '') return { label: 'Enter actual stock', cls: 'blank', dev: '' };
-  const dev = actual - expected;
+  if (actual === expected) return { label: 'ERROR', cls: 'error', dev: 0 };
+  const dev = (actual - expected) + (pdfDev === '' || pdfDev == null ? 0 : pdfDev);
   if (dev < 0) return { label: 'Underdelivery (' + dev + ')', cls: 'under', dev };
   if (dev > 0) return { label: 'Overdelivery (+' + dev + ')', cls: 'over', dev };
-  return { label: 'ERROR', cls: 'error', dev };
+  return { label: 'OK (0)', cls: 'ok', dev };
 }
 
 // --- card flow ---
@@ -257,6 +262,7 @@ function renderCard() {
   $('cShelf').textContent = r.shelfId;
   $('cName').textContent = r.name;
   $('cSku').textContent = 'SKU ' + r.sku;
+  $('cSysDev').textContent = 'System deviation (from PDF): ' + (r.deviation === '' ? '—' : r.deviation);
   $('cExp').value = r.userExpected;
   $('cAct').value = r.actual;
   $('progress').textContent = (idx + 1) + ' / ' + rows.length;
@@ -270,7 +276,7 @@ function renderCard() {
 function updateStatus() {
   const e = $('cExp').value === '' ? '' : Number($('cExp').value);
   const a = $('cAct').value === '' ? '' : Number($('cAct').value);
-  const { label, cls } = classify(e, a);
+  const { label, cls } = classify(e, a, rows[idx].deviation);
   const s = $('cStatus');
   s.textContent = label;
   s.className = 'status ' + cls;
@@ -289,7 +295,7 @@ function showSummary() {
   list.innerHTML = '';
   let flagged = 0;
   rows.forEach(r => {
-    const { label, cls } = classify(r.userExpected, r.actual);
+    const { label, cls } = classify(r.userExpected, r.actual, r.deviation);
     const tag = r.actual === '' ? { t: 'Not checked', c: 'todo' }
               : { t: label, c: cls };
     if (cls !== 'blank') flagged++;
@@ -306,7 +312,7 @@ function showSummary() {
 // then hand off to the browser's native print → "Save as PDF".
 function exportPdf() {
   const body = rows.map(r => {
-    const { label } = classify(r.userExpected, r.actual);
+    const { label } = classify(r.userExpected, r.actual, r.deviation);
     const status = r.actual === '' ? '' : ` <span class="pstatus">— ${label}</span>`;
     return `<tr>
       <td>${r.hub}</td><td>${r.sku}</td>
@@ -342,10 +348,11 @@ function exportPdf() {
 }
 
 // self-check
-console.assert(classify(12, 0).cls === 'under', 'neg dev = underdelivery');
-console.assert(classify(4, 8).cls === 'over', 'pos dev = overdelivery');
-console.assert(classify(5, 5).cls === 'error', 'equal = error');
-console.assert(classify(5, '').cls === 'blank', 'missing actual = blank');
+console.assert(classify(6, 12, -18).cls === 'under' && classify(6, 12, -18).dev === -12, 'example: under 12');
+console.assert(classify(6, 10, 0).cls === 'over' && classify(6, 10, 0).dev === 4, 'pos = overdelivery');
+console.assert(classify(5, 5, -3).cls === 'error', 'count == system = error');
+console.assert(classify(6, 4, 2).cls === 'ok', 'nets to zero = ok');
+console.assert(classify(5, '', 0).cls === 'blank', 'missing actual = blank');
 </script>
 </body>
 </html>
