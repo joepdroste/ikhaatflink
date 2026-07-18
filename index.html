@@ -178,7 +178,7 @@ async function load(file) {
   meta = parseMeta(lines);
   meta.hub = (rows[0] && rows[0].hub) || meta.hub || '';
   rows.sort((a, b) => a.shelfId.localeCompare(b.shelfId, undefined, { numeric: true }));
-  rows.forEach(r => { r.actual = ''; });
+  rows.forEach(r => { r.userExpected = ''; r.actual = ''; });
   $('loadInfo').textContent = 'Loaded ' + file.name + ' — ' + rows.length + ' items.';
   $('startBtn').disabled = rows.length === 0;
 }
@@ -246,8 +246,8 @@ function parseMeta(lines) {
 function classify(expected, actual) {
   if (expected === '' || actual === '') return { label: 'Enter actual stock', cls: 'blank', dev: '' };
   const dev = actual - expected;
-  if (dev < 0) return { label: 'Underdelivery (' + dev + ')', cls: 'under', dev };
-  if (dev > 0) return { label: 'Overdelivery (+' + dev + ')', cls: 'over', dev };
+  if (dev < 0) return { label: 'Overdelivery (' + dev + ')', cls: 'over', dev };
+  if (dev > 0) return { label: 'Underdelivery (+' + dev + ')', cls: 'under', dev };
   return { label: 'ERROR', cls: 'error', dev };
 }
 
@@ -257,7 +257,7 @@ function renderCard() {
   $('cShelf').textContent = r.shelfId;
   $('cName').textContent = r.name;
   $('cSku').textContent = 'SKU ' + r.sku;
-  $('cExp').value = r.expected;
+  $('cExp').value = r.userExpected;
   $('cAct').value = r.actual;
   $('progress').textContent = (idx + 1) + ' / ' + rows.length;
   $('barFill').style.width = ((idx + 1) / rows.length * 100) + '%';
@@ -276,7 +276,7 @@ function updateStatus() {
   s.className = 'status ' + cls;
 }
 
-$('cExp').addEventListener('input', () => { rows[idx].expected = $('cExp').value === '' ? '' : Number($('cExp').value); updateStatus(); });
+$('cExp').addEventListener('input', () => { rows[idx].userExpected = $('cExp').value === '' ? '' : Number($('cExp').value); updateStatus(); });
 $('cAct').addEventListener('input', () => { rows[idx].actual = $('cAct').value === '' ? '' : Number($('cAct').value); updateStatus(); });
 $('prevBtn').addEventListener('click', () => { if (idx > 0) { idx--; renderCard(); } });
 $('nextBtn').addEventListener('click', () => {
@@ -289,7 +289,7 @@ function showSummary() {
   list.innerHTML = '';
   let flagged = 0;
   rows.forEach(r => {
-    const { label, cls } = classify(r.expected, r.actual);
+    const { label, cls } = classify(r.userExpected, r.actual);
     const tag = r.actual === '' ? { t: 'Not checked', c: 'todo' }
               : { t: label, c: cls };
     if (cls !== 'blank') flagged++;
@@ -306,7 +306,7 @@ function showSummary() {
 // then hand off to the browser's native print → "Save as PDF".
 function exportPdf() {
   const body = rows.map(r => {
-    const { label } = classify(r.expected, r.actual);
+    const { label } = classify(r.userExpected, r.actual);
     const status = r.actual === '' ? '' : ` <span class="pstatus">— ${label}</span>`;
     return `<tr>
       <td>${r.hub}</td><td>${r.sku}</td>
@@ -342,8 +342,8 @@ function exportPdf() {
 }
 
 // self-check
-console.assert(classify(12, 0).cls === 'under', 'neg dev = underdelivery');
-console.assert(classify(4, 8).cls === 'over', 'pos dev = overdelivery');
+console.assert(classify(12, 0).cls === 'over', 'neg dev = overdelivery');
+console.assert(classify(4, 8).cls === 'under', 'pos dev = underdelivery');
 console.assert(classify(5, 5).cls === 'error', 'equal = error');
 console.assert(classify(5, '').cls === 'blank', 'missing actual = blank');
 </script>
